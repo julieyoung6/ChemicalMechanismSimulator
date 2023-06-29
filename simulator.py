@@ -1,5 +1,5 @@
 
-def simple_reaction(source_species, source_amount, reactants, products, reaction_rate_constants):
+def simple_reaction(source_species, source_amount, reactants, reactant_coeffs, products, product_coeffs, reaction_rate_constants):
     reaction_prod = []
     branches_i = []
     sum_rate_constants = 0
@@ -13,8 +13,9 @@ def simple_reaction(source_species, source_amount, reactants, products, reaction
     
     # solve each branch
     for b in branches_i:
-        p_amount = (reaction_rate_constants[b]/sum_rate_constants) * source_amount
-        reaction_prod.append([products[b][0], p_amount])
+        for p in range(len(products[b])):
+            p_amount = (reaction_rate_constants[b]/sum_rate_constants) * source_amount * product_coeffs[b][p]
+            reaction_prod.append([products[b][p], p_amount])
 
     return reaction_prod, len(branches_i)
 
@@ -36,7 +37,7 @@ def sim(species, reactants, reactant_coeffs, products, product_coeffs, reaction_
         if r_check <= r:
             next_source = []
             for s in source:
-                reaction_prod, num_branches = simple_reaction([s], final_species_amount[species.index(s)], reactants, products, reaction_rate_constants)
+                reaction_prod, num_branches = simple_reaction([s], final_species_amount[species.index(s)], reactants, reactant_coeffs, products, product_coeffs, reaction_rate_constants)
                 for p in reaction_prod:
                     final_species_amount[species.index(p[0][0])] += p[1]
                     next_source.append(p[0])
@@ -51,8 +52,5 @@ def sim(species, reactants, reactant_coeffs, products, product_coeffs, reaction_
     return species, final_species_amount
 
 
-print(sim(["A", "B", "C"], [["A"],["A"]], [[1],[1]], [["B"],["C"]], [[1],[1]], [1,3]))
-print(sim(["A", "B", "C","D"], [["A"],["B"],["A"]], [[1],[1]], [["B"],["D"],["C"]], [[1],[1]], [1,8,3]))
-
-print(sim(["A", "B", "C","D"], [["A"],["B"], ["C"],["A"]], [[1],[1]], [["B"], ["D"],["D"],["C"]], [[1],[1]], [1,3,4,2]))
-print(sim(["A", "B", "C","D","E","F"], [["A"],["A"],["B"], ["C"], ["D"],["A"]], [[1],[1]], [["C"],["D"],["F"],["E"],["E"],["B"]], [[1],[1]], [2,1,3,3,3,1]))
+print(sim(["A", "B", "C", "D"], [["A"],["A"]], [[1],[1]], [["B"],["C", "D"]], [[1],[1, 2]], [1,3]))
+print(sim(["A", "B", "C","D", "E"], [["A"],["A"],["D"]],[[1],[1], [2]], [["B","C"],["D"],["E"]], [[1,2],[2], [.5]], [3,1, 3]))
