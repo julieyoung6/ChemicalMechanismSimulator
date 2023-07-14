@@ -41,6 +41,7 @@ def find_reversible_reaction(reactants, products):
 def external_species_extrapolation(starting_species, rr_sources, rr_species, species, reactants, reactant_coeffs, products, product_coeffs, reaction_rate_constants, final_species_amount, current_species_amount):
     # extrapolates final yield for external species of a reversible reaction
 
+    cycle_starting_amount = current_species_amount[species.index(starting_species[0])]
     # find external species
     external_species = []
     for i, reactant in enumerate(reactants):
@@ -54,12 +55,13 @@ def external_species_extrapolation(starting_species, rr_sources, rr_species, spe
     # run cycle for 20 steps
     source = starting_species
     for i in range(20):
+        # print(i, current_species_amount, final_species_amount)
         next_source = []
-        for s in source:
-            if [s] in rr_sources:
-                final_species_amount, current_species_amount, next_sources = simple_reaction([s], current_species_amount[species.index(s)], species, reactants, reactant_coeffs, products, product_coeffs, reaction_rate_constants, final_species_amount, current_species_amount)
-                for ns in next_sources:
-                    next_source.append(ns)
+        validated_sources = [x for x in source if [x] in rr_sources]
+       
+        final_species_amount, current_species_amount, next_sources = cycle(validated_sources, species, reactants, reactant_coeffs, products, product_coeffs, reaction_rate_constants, final_species_amount, current_species_amount)
+        for ns in next_sources:
+            next_source.append(ns)
         next_source = list(set(next_source))
         source = next_source
  
@@ -76,9 +78,45 @@ def external_species_extrapolation(starting_species, rr_sources, rr_species, spe
     # extrapolate each external species value if 100% of the source left the cycle
     for i, es in enumerate(external_species):
         print(es, twenty_step_vals[i], ten_step_vals[i], twenty_step_source_out_of_cycle, ten_step_source_out_of_cycle)
-        final_species_amount[species.index(es[0])] = (twenty_step_vals[i] - ten_step_vals[i])/(twenty_step_source_out_of_cycle - ten_step_source_out_of_cycle)
+        final_species_amount[species.index(es[0])] = ((twenty_step_vals[i] - ten_step_vals[i])/(twenty_step_source_out_of_cycle - ten_step_source_out_of_cycle) * (1-twenty_step_source_out_of_cycle) + twenty_step_vals[i])  * cycle_starting_amount 
 
     return external_species, final_species_amount
+
+def cycle(source_species, species, reactants, reactant_coeffs, products, product_coeffs, reaction_rate_constants, final_species_amount, current_species_amount):
+    next_sources = []
+
+    # solve each source branch
+    for source in source_species:
+        branches_i = []
+        sum_rate_constants = 0
+
+        # constant multiplier in place of concentration of the second reactant (if there is one)
+        x = .5
+
+        # find indices of each branch
+        for i, r in enumerate(reactants):
+            if source in r:
+                branches_i.append(i)
+                if len(r) == 1:
+                    sum_rate_constants += reaction_rate_constants[i]
+                else: # assuming max of 2 reactants
+                    sum_rate_constants += (reaction_rate_constants[i] * x)
+                    reaction_rate_constants[i] *= x
+
+        # solve each branch
+        for b in branches_i:
+            for p in range(len(products[b])):
+                p_amount = (reaction_rate_constants[b]/sum_rate_constants) * current_species_amount[species.index(source)] * product_coeffs[b][p]
+                # print(products[b][p], p_amount)
+                # assign values to final and current amounts
+                final_species_amount[species.index(products[b][p])] += p_amount
+                current_species_amount[species.index(products[b][p])] += p_amount
+                next_sources.append(products[b][p])
+
+        current_species_amount[species.index(source)] = 0
+
+    return final_species_amount, current_species_amount, next_sources
+
 
 def simple_reaction(source_species, source_amount, species, reactants, reactant_coeffs, products, product_coeffs, reaction_rate_constants, final_species_amount, current_species_amount):
     reaction_prod = []
@@ -165,10 +203,10 @@ def sim(species, reactants, reactant_coeffs, products, product_coeffs, reaction_
 
 
 # # Cycle w/ more than 2 species B<-->C<-->E
-# print(sim(["A", "B", "C","D", "E", "F"],[["A"],["B"],["B"],["C"],["C"], ["E"], ["E"]],[[1],[1],[1],[1],[1], [1],[1]], [["B"],["C"],["D"],["B"],["E"], ["C"], ["F"]],[[1],[1],[1],[1],[1],[1],[1]], [1,1,1,1,1,1,1]))
+print(sim(["A", "B", "C","D", "E", "F"],[["A"],["B"],["B"],["C"],["C"], ["E"], ["E"]],[[1],[1],[1],[1],[1], [1],[1]], [["B"],["C"],["D"],["B"],["E"], ["C"], ["F"]],[[1],[1],[1],[1],[1],[1],[1]], [1,1,1,1,1,1,1]))
 
 # # Disconnected Cycle Test B<-->C and E<-->F
-# print(sim(["A", "B", "C","D", "E", "F", "G"],[["A"],["B"],["B"],["C"],["C"], ["E"], ["F"], ["F"]],[[1],[1],[1],[1],[1], [1],[1],[1]], [["B"],["C"],["D"],["B"],["E"], ["F"], ["E"], ["G"]],[[1],[1],[1],[1],[1],[1],[1],[1]], [1,1,1,1,1,1,1,1]))
+print(sim(["A", "B", "C","D", "E", "F", "G"],[["A"],["B"],["B"],["C"],["C"], ["E"], ["F"], ["F"]],[[1],[1],[1],[1],[1], [1],[1],[1]], [["B"],["C"],["D"],["B"],["E"], ["F"], ["E"], ["G"]],[[1],[1],[1],[1],[1],[1],[1],[1]], [1,1,1,1,1,1,1,1]))
 
 # Multiple Reactants Step 1
-print(sim(["A", "B", "C", "D"], [["A","B"],["A"]], [[1,1],[1]], [["D"],["C"]], [[1],[1]],[1,1]))
+# print(sim(["A", "B", "C", "D"], [["A","B"],["A"]], [[1,1],[1]], [["D"],["C"]], [[1],[1]],[1,1]))
