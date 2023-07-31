@@ -55,7 +55,6 @@ def external_species_extrapolation(starting_species, rr_sources, rr_species, spe
     # run cycle for 20 steps
     source = starting_species
     for i in range(20):
-        # print(i, current_species_amount, final_species_amount)
         next_source = []
         validated_sources = [x for x in source if [x] in rr_sources]
        
@@ -107,7 +106,7 @@ def cycle(source_species, species, reactants, reactant_coeffs, products, product
         for b in branches_i:
             for p in range(len(products[b])):
                 p_amount = (reaction_rate_constants[b]/sum_rate_constants) * current_species_amount[species.index(source)] * product_coeffs[b][p]
-                # print(products[b][p], p_amount)
+
                 # assign values to final and current amounts
                 final_species_amount[species.index(products[b][p])] += p_amount
                 current_species_amount[species.index(products[b][p])] += p_amount
@@ -137,16 +136,16 @@ def simple_reaction(source_species, source_amount, species, reactants, reactant_
                 sum_rate_constants += (reaction_rate_constants[i] * x)
                 reaction_rate_constants[i] *= x
 
-
     # solve each branch
     for b in branches_i:
+        
         for p in range(len(products[b])):
             p_amount = (reaction_rate_constants[b]/sum_rate_constants) * source_amount * product_coeffs[b][p]
             reaction_prod.append([products[b][p], p_amount])
 
              # assign values to final and current amounts
             final_species_amount[species.index(products[b][p])] += p_amount
-            current_species_amount[species.index(products[b][p])] = p_amount
+            current_species_amount[species.index(products[b][p])] += p_amount
             next_sources.append(products[b][p])
 
     return final_species_amount, current_species_amount, next_sources
@@ -167,9 +166,12 @@ def sim(species, reactants, reactant_coeffs, products, product_coeffs, reaction_
     source = [species[source_species_index]]
 
     reversible_reactions, rr_species = find_reversible_reaction(reactants, products)
-    r_check = 0
 
     for r in range(len(reactants) - len(rr_species)):
+
+        if source == []:
+            break
+
         next_source = []
         for s in source:
             # if species is involved in a reversible reaction use extrapolation method
@@ -195,6 +197,10 @@ def sim(species, reactants, reactant_coeffs, products, product_coeffs, reaction_
         next_source = list(set(next_source))
         source = next_source
 
+    # prints each species and final value 
+    for i, s in enumerate(species):
+        print(s, final_species_amount[i])
+
     return species, final_species_amount
 
 
@@ -203,10 +209,42 @@ def sim(species, reactants, reactant_coeffs, products, product_coeffs, reaction_
 
 
 # # Cycle w/ more than 2 species B<-->C<-->E
-print(sim(["A", "B", "C","D", "E", "F"],[["A"],["B"],["B"],["C"],["C"], ["E"], ["E"]],[[1],[1],[1],[1],[1], [1],[1]], [["B"],["C"],["D"],["B"],["E"], ["C"], ["F"]],[[1],[1],[1],[1],[1],[1],[1]], [1,1,1,1,1,1,1]))
+# print(sim(["A", "B", "C","D", "E", "F"],[["A"],["B"],["B"],["C"],["C"], ["E"], ["E"]],[[1],[1],[1],[1],[1], [1],[1]], [["B"],["C"],["D"],["B"],["E"], ["C"], ["F"]],[[1],[1],[1],[1],[1],[1],[1]], [1,200,1,200,1,1,1]))
 
 # # Disconnected Cycle Test B<-->C and E<-->F
-print(sim(["A", "B", "C","D", "E", "F", "G"],[["A"],["B"],["B"],["C"],["C"], ["E"], ["F"], ["F"]],[[1],[1],[1],[1],[1], [1],[1],[1]], [["B"],["C"],["D"],["B"],["E"], ["F"], ["E"], ["G"]],[[1],[1],[1],[1],[1],[1],[1],[1]], [1,1,1,1,1,1,1,1]))
+# print(sim(["A", "B", "C","D", "E", "F", "G"],[["A"],["B"],["B"],["C"],["C"], ["E"], ["F"], ["F"]],[[1],[1],[1],[1],[1], [1],[1],[1]], [["B"],["C"],["D"],["B"],["E"], ["F"], ["E"], ["G"]],[[1],[1],[1],[1],[1],[1],[1],[1]], [1,1,1,1,1,1,1,1]))
 
 # Multiple Reactants Step 1
 # print(sim(["A", "B", "C", "D"], [["A","B"],["A"]], [[1,1],[1]], [["D"],["C"]], [[1],[1]],[1,1]))
+
+
+# Test Mini Dag Reaction
+# sim(["A", "B", "C","D"], [["A"],["A"],["A"],["B"],["C"]], [[1],[1],[1],[1],[1]], [["B"],["C"],["D"],["C"],["D"]],[[1],[1],[1],[1],[1]],[1,1,1,1,1] )
+# create_f0am_file(["A", "B", "C","D"], [["A"],["A"],["A"],["B"],["C"]], [[1],[1],[1],[1],[1]], [["B"],["C"],["D"],["C"],["D"]],[[1],[1],[1],[1],[1]],[1,1,1,1,1], 'mini_test_dag_reaction')
+
+import pandas as pd
+
+# df = pd.read_csv('tree_reactions.csv', header=None)
+# df = pd.read_csv('dag_reactions.csv', header=None)
+df = pd.read_csv('cyclic_graph_reactions.csv', header=None)
+df.columns = ["reactants", "products"]
+
+reactants = []
+products = []
+rrconstants = []
+coeffs = []
+species = []
+
+for i, r in enumerate(df["reactants"]):
+    if r not in species:
+        species.append(r)
+    if df["products"][i] not in species:
+        species.append(df["products"][i])
+    reactants.append([r])
+    products.append([df["products"][i]])
+    rrconstants.append(1)
+    coeffs.append([1])
+species.sort()
+
+sim(species, reactants, coeffs, products, coeffs.copy(), rrconstants)
+# create_f0am_file(species, reactants, coeffs, products, coeffs.copy(), rrconstants, 'cyclic_reactions')
